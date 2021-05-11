@@ -166,7 +166,7 @@ def save_model(states, save_pth):
         #     torch.save(state, modelpth)
 
 
-def train(logtime):
+def train(loginfo):
     logger = logging.getLogger()
     # is_dist = dist.is_initialized()
 
@@ -277,7 +277,7 @@ def train(logtime):
             # save_path = os.path.join(cfg.weight_path,
             #     'epoch{:d}_valid_loss_{:.4f}.pth'.format(n_epoch, valid_loss))
             if not os.path.exists(cfg.weight_path): os.makedirs(cfg.weight_path)
-            save_path = os.path.join(cfg.weight_path, 'model_bestValidLoss-{}.pth'.format(logtime))
+            save_path = os.path.join(cfg.weight_path, 'model_bestValidLoss-{}.pth'.format(loginfo))
             logger.info('save models to {}'.format(save_path))
             torch.save(net.state_dict(), save_path)
             best_valid_loss = valid_loss
@@ -328,9 +328,9 @@ def main():
     if not os.path.exists(cfg.respth): os.makedirs(cfg.respth)
     np.set_printoptions(precision=8, floatmode='maxprec', suppress=True)
     # setup_logger('{}-train-{}'.format(cfg.model_type,cfg.log_level), cfg.respth, cfg.log_level)
-    logtime = setup_logger('{}-train-{}'.format(cfg.model_type,cfg.log_level),
+    loginfo = setup_logger('{}-train-{}'.format(cfg.model_type,cfg.log_level),
                         cfg.respth, cfg.log_level)
-    train(logtime)
+    train(loginfo)
 
 
 if __name__ == "__main__":
