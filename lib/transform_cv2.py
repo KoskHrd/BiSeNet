@@ -19,35 +19,35 @@ class RandomResizedCrop(object):
         self.scales = scales
         self.size = size
 
-    def __call__(self, im_lb):
+    def __call__(self, img_tar):
         if self.size is None:
-            return im_lb
+            return img_tar
 
-        im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+        img, tar = img_tar['img'], img_tar['tar']
+        assert img.shape[:2] == tar.shape[:2]
 
         crop_h, crop_w = self.size
         scale = np.random.uniform(min(self.scales), max(self.scales))
-        im_h, im_w = [math.ceil(el * scale) for el in im.shape[:2]]
-        im = cv2.resize(im, (im_w, im_h))
-        lb = cv2.resize(lb, (im_w, im_h), interpolation=cv2.INTER_NEAREST)
+        img_h, img_w = [math.ceil(el * scale) for el in img.shape[:2]]
+        img = cv2.resize(img, (img_w, img_h))
+        tar = cv2.resize(tar, (img_w, img_h), interpolation=cv2.INTER_NEAREST)
 
-        if (im_h, im_w) == (crop_h, crop_w): return dict(im=im, lb=lb)
+        if (img_h, img_w) == (crop_h, crop_w): return dict(img=img, tar=tar)
         pad_h, pad_w = 0, 0
-        if im_h < crop_h:
-            pad_h = (crop_h - im_h) // 2 + 1
-        if im_w < crop_w:
-            pad_w = (crop_w - im_w) // 2 + 1
+        if img_h < crop_h:
+            pad_h = (crop_h - img_h) // 2 + 1
+        if img_w < crop_w:
+            pad_w = (crop_w - img_w) // 2 + 1
         if pad_h > 0 or pad_w > 0:
-            im = np.pad(im, ((pad_h, pad_h), (pad_w, pad_w), (0, 0)))
-            lb = np.pad(lb, ((pad_h, pad_h), (pad_w, pad_w)), 'constant', constant_values=255)
+            img = np.pad(img, ((pad_h, pad_h), (pad_w, pad_w), (0, 0)))
+            tar = np.pad(tar, ((pad_h, pad_h), (pad_w, pad_w)), 'constant', constant_values=255)
 
-        im_h, im_w, _ = im.shape
+        img_h, img_w, _ = img.shape
         sh, sw = np.random.random(2)
-        sh, sw = int(sh * (im_h - crop_h)), int(sw * (im_w - crop_w))
+        sh, sw = int(sh * (img_h - crop_h)), int(sw * (img_w - crop_w))
         return dict(
-            im=im[sh:sh+crop_h, sw:sw+crop_w, :].copy(),
-            lb=lb[sh:sh+crop_h, sw:sw+crop_w].copy()
+            img=img[sh:sh+crop_h, sw:sw+crop_w, :].copy(),
+            tar=tar[sh:sh+crop_h, sw:sw+crop_w].copy()
         )
 
 
@@ -57,14 +57,14 @@ class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
-    def __call__(self, im_lb):
+    def __call__(self, img_tar):
         if np.random.random() < self.p:
-            return im_lb
-        im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+            return img_tar
+        img, tar = img_tar['img'], img_tar['tar']
+        assert img.shape[:2] == tar.shape[:2]
         return dict(
-            im=im[:, ::-1, :],
-            lb=lb[:, ::-1],
+            img=img[:, ::-1, :],
+            tar=tar[:, ::-1],
         )
 
 
@@ -79,42 +79,42 @@ class ColorJitter(object):
         if not saturation is None and saturation >= 0:
             self.saturation = [max(1-saturation, 0), 1+saturation]
 
-    def __call__(self, im_lb):
-        im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+    def __call__(self, img_tar):
+        img, tar = img_tar['img'], img_tar['tar']
+        assert img.shape[:2] == tar.shape[:2]
         if not self.brightness is None:
             rate = np.random.uniform(*self.brightness)
-            im = self.adj_brightness(im, rate)
+            img = self.adj_brightness(img, rate)
         if not self.contrast is None:
             rate = np.random.uniform(*self.contrast)
-            im = self.adj_contrast(im, rate)
+            img = self.adj_contrast(img, rate)
         if not self.saturation is None:
             rate = np.random.uniform(*self.saturation)
-            im = self.adj_saturation(im, rate)
-        return dict(im=im, lb=lb,)
+            img = self.adj_saturation(img, rate)
+        return dict(img=img, tar=tar,)
 
-    def adj_saturation(self, im, rate):
+    def adj_saturation(self, img, rate):
         M = np.float32([
             [1+2*rate, 1-rate, 1-rate],
             [1-rate, 1+2*rate, 1-rate],
             [1-rate, 1-rate, 1+2*rate]
         ])
-        shape = im.shape
-        im = np.matmul(im.reshape(-1, 3), M).reshape(shape)/3
-        im = np.clip(im, 0, 255).astype(np.uint8)
-        return im
+        shape = img.shape
+        img = np.matmul(img.reshape(-1, 3), M).reshape(shape)/3
+        img = np.clip(img, 0, 255).astype(np.uint8)
+        return img
 
-    def adj_brightness(self, im, rate):
+    def adj_brightness(self, img, rate):
         table = np.array([
             i * rate for i in range(256)
         ]).clip(0, 255).astype(np.uint8)
-        return table[im]
+        return table[img]
 
-    def adj_contrast(self, im, rate):
+    def adj_contrast(self, img, rate):
         table = np.array([
             74 + (i - 74) * rate for i in range(256)
         ]).clip(0, 255).astype(np.uint8)
-        return table[im]
+        return table[img]
 
 
 
@@ -127,16 +127,16 @@ class ToTensor(object):
         self.mean = mean
         self.std = std
 
-    def __call__(self, im_lb):
-        im, lb = im_lb['im'], im_lb['lb']
-        im = im[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) # to rgb order
-        im = torch.from_numpy(im).div_(255)
-        dtype, device = im.dtype, im.device
+    def __call__(self, img_tar):
+        img, tar = img_tar['img'], img_tar['tar']
+        img = img[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) # to rgb order
+        img = torch.from_numpy(img).div_(255)
+        dtype, device = img.dtype, img.device
         mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
         std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
-        im = im.sub_(mean).div_(std).clone()
-        lb = torch.from_numpy(lb.astype(np.int64).copy()).clone()
-        return dict(im=im, lb=lb)
+        img = img.sub_(mean).div_(std).clone()
+        tar = torch.from_numpy(tar.astype(np.int64).copy()).clone()
+        return dict(img=img, tar=tar)
 
 
 class Compose(object):
@@ -144,25 +144,25 @@ class Compose(object):
     def __init__(self, do_list):
         self.do_list = do_list
 
-    def __call__(self, im_lb):
+    def __call__(self, img_tar):
         for comp in self.do_list:
-            im_lb = comp(im_lb)
-        return im_lb
+            img_tar = comp(img_tar)
+        return img_tar
 
 
 
 
 if __name__ == '__main__':
     #  from PIL import Image
-    #  im = Image.open(imgpth)
-    #  lb = Image.open(lbpth)
-    #  print(lb.size)
-    #  im.show()
-    #  lb.show()
+    #  img = Image.open(imgpth)
+    #  tar = Image.open(tarpth)
+    #  print(tar.size)
+    #  img.show()
+    #  tar.show()
     import cv2
-    im = cv2.imread(imgpth)
-    lb = cv2.imread(lbpth, 0)
-    lb = lb * 10
+    img = cv2.imread(imgpth)
+    tar = cv2.imread(tarpth, 0)
+    tar = tar * 10
 
     trans = Compose([
         RandomHorizontalFlip(),
@@ -179,22 +179,22 @@ if __name__ == '__main__':
         ),
         #  RandomEqualize(p=0.1),
     ])
-    #  inten = dict(im=im, lb=lb)
+    #  inten = dict(img=img, tar=tar)
     #  out = trans(inten)
-    #  im = out['im']
-    #  lb = out['lb']
-    #  cv2.imshow('lb', lb)
-    #  cv2.imshow('org', im)
+    #  img = out['img']
+    #  tar = out['tar']
+    #  cv2.imshow('tar', tar)
+    #  cv2.imshow('org', img)
     #  cv2.waitKey(0)
 
 
     ### try merge rotate and shear here
-    im = cv2.imread(imgpth)
-    lb = cv2.imread(lbpth, 0)
-    im = cv2.resize(im, (1024, 512))
-    lb = cv2.resize(lb, (1024, 512), interpolation=cv2.INTER_NEAREST)
-    lb = lb * 10
-    inten = dict(im=im, lb=lb)
+    img = cv2.imread(imgpth)
+    tar = cv2.imread(tarpth, 0)
+    img = cv2.resize(img, (1024, 512))
+    tar = cv2.resize(tar, (1024, 512), interpolation=cv2.INTER_NEAREST)
+    tar = tar * 10
+    inten = dict(img=img, tar=tar)
     trans1 = Compose([
         RandomShear(p=1, rate=0.15),
         #  RandomRotate(p=1, degree=10),
@@ -204,17 +204,17 @@ if __name__ == '__main__':
         RandomHFlipShearRotate(p_flip=0.5, p_shear=1, p_rot=0, rate_shear=0.1, rot_degree=9),
     ])
     out1 = trans1(inten)
-    im1 = out1['im']
-    lb1 = out1['lb']
-    #  cv2.imshow('lb', lb1)
-    cv2.imshow('org1', im1)
+    img1 = out1['img']
+    tar1 = out1['tar']
+    #  cv2.imshow('tar', tar1)
+    cv2.imshow('org1', img1)
     out2 = trans2(inten)
-    im2 = out2['im']
-    lb2 = out2['lb']
-    #  cv2.imshow('lb', lb1)
-    #  cv2.imshow('org2', im2)
+    img2 = out2['img']
+    tar2 = out2['tar']
+    #  cv2.imshow('tar', tar1)
+    #  cv2.imshow('org2', img2)
     cv2.waitKey(0)
-    print(np.sum(im1-im2))
+    print(np.sum(img1-img2))
     print('====')
     ####
 
@@ -223,17 +223,17 @@ if __name__ == '__main__':
         mean=(0.406, 0.456, 0.485),
         std=(0.225, 0.224, 0.229)
     )
-    #  print(im[0, :2, :2])
-    print(lb[:2, :2])
+    #  print(img[0, :2, :2])
+    print(tar[:2, :2])
     out = totensor(out)
-    im = out['im']
-    lb = out['lb']
-    print(im.size())
-    #  print(im[0, :2, :2])
-    #  print(lb[:2, :2])
+    img = out['img']
+    tar = out['tar']
+    print(img.size())
+    #  print(img[0, :2, :2])
+    #  print(tar[:2, :2])
 
     out = totensor(inten)
-    im = out['im']
-    print(im.size())
-    print(im[0, 502:504, 766:768])
+    img = out['img']
+    print(img.size())
+    print(img[0, 502:504, 766:768])
 

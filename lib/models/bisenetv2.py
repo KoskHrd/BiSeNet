@@ -169,10 +169,10 @@ class GELayerS2(nn.Module):
         return feat
 
 
-class SegmentBranch(nn.Module):
+class SemanticBranch(nn.Module):
 
     def __init__(self):
-        super(SegmentBranch, self).__init__()
+        super(SemanticBranch, self).__init__()
         self.S1S2 = StemBlock()
         self.S3 = nn.Sequential(
             GELayerS2(16, 32),
@@ -250,11 +250,11 @@ class BGALayer(nn.Module):
         right1 = self.right1(x_s)
         right2 = self.right2(x_s)
         right1 = F.interpolate(
-            right1, size=dsize, mode='bilinear', align_corners=True)
+            right1, size=dsize, mode='bilinear', align_corners=True) # upsample(resize)
         left = left1 * torch.sigmoid(right1)
         right = left2 * torch.sigmoid(right2)
         right = F.interpolate(
-            right, size=dsize, mode='bilinear', align_corners=True)
+            right, size=dsize, mode='bilinear', align_corners=True) # upsample(resize)
         out = self.conv(left + right)
         return out
 
@@ -272,7 +272,7 @@ class SegmentHead(nn.Module):
 
     def forward(self, x, size=None):
         feat = self.conv(x)
-        feat = self.drop(feat)
+        # feat = self.drop(feat)  # not shown in paper
         feat = self.conv_out(feat)
         if not size is None:
             feat = F.interpolate(feat, size=size,
@@ -285,11 +285,12 @@ class BiSeNetV2(nn.Module):
     def __init__(self, n_classes):
         super(BiSeNetV2, self).__init__()
         self.detail = DetailBranch()
-        self.segment = SegmentBranch()
+        self.semantic = SemanticBranch()
         self.bga = BGALayer()
 
         ## TODO: what is the number of mid chan ?
-        self.head = SegmentHead(128, 1024, n_classes)
+        # self.head = SegmentHead(128, 1024, n_classes)
+        self.head = SegmentHead(128, 128, n_classes)
         self.aux2 = SegmentHead(16, 128, n_classes)
         self.aux3 = SegmentHead(32, 128, n_classes)
         self.aux4 = SegmentHead(64, 128, n_classes)
@@ -300,7 +301,7 @@ class BiSeNetV2(nn.Module):
     def forward(self, x):
         size = x.size()[2:]
         feat_d = self.detail(x)
-        feat2, feat3, feat4, feat5_4, feat_s = self.segment(x)
+        feat2, feat3, feat4, feat5_4, feat_s = self.semantic(x)
         feat_head = self.bga(feat_d, feat_s)
 
         logits = self.head(feat_head, size)
@@ -361,15 +362,27 @@ if __name__ == "__main__":
     #  print(logits.size())
     #
     #  x = torch.randn(16, 3, 1024, 2048)
-    #  segment = SegmentBranch()
-    #  feat = segment(x)[0]
+    #  semantic = SemanticBranch()
+    #  feat = semantic(x)[0]
     #  print(feat.size())
     #
-    x = torch.randn(16, 3, 512, 1024)
-    model = BiSeNetV2(n_classes=19)
+    # x = torch.randn(16, 3, 512, 1024)
+    x = torch.randn(1, 3, 512, 1024)
+    # model = BiSeNetV2(n_classes=19)
+    model = BiSeNetV2(n_classes=23).eval()
     logits = model(x)[0]
-    print(logits.size())
+    print("logits.size(): {}".format(logits.size()))
+    # print("logits: {}".format(logits))
+    probs = torch.zeros(
+            (1, 23, 512, 1024), dtype=torch.float32).detach()
+    probs += torch.softmax(logits, dim=1)
+    print("probs.size(): {}".format(probs.size()))
+    # print("probs: {}".format(probs))
+    preds = torch.argmax(probs, dim=1)
+    print("preds.size(): {}".format(preds.size()))
+    print("preds: {}".format(preds))
 
     for name, param in model.named_parameters():
         if len(param.size()) == 1:
-            print(name)
+            # print(name)
+            pass

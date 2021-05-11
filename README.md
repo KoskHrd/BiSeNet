@@ -4,6 +4,7 @@ My implementation of [BiSeNetV1](https://arxiv.org/abs/1808.00897) and [BiSeNetV
 
 
 The mIOU evaluation result of the models trained and evaluated on cityscapes train/val set is:
+
 | none | ss | ssc | msf | mscf | fps | link |
 |------|:--:|:---:|:---:|:----:|:---:|:----:|
 | bisenetv1 | 74.85 | 76.46 | 77.36 | 78.72 | - | [download](https://drive.google.com/file/d/1e1_E7OrpjTaD5Rael7Fus5lg-uGZ5TUZ/view?usp=sharing) |
@@ -80,5 +81,3 @@ $ python tools/evaluate.py --model bisenetv1 --weight-path /path/to/your/weight.
 ```
 
 ### Be aware that this is the refactored version of the original codebase. You can go to the `old` directory for original implementation.
-
-

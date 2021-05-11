@@ -1,0 +1,45 @@
+version: "3.9"
+services:
+  # nvidia:
+  #   image: nvidia/cuda:11.0-base-ubuntu18.04
+  #   command: nvidia-smi
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #         - driver: nvidia
+  #           count: 2
+  #           capabilities: [gpu, utility]
+  pytorch:
+    container_name: pytorch-bisenetv2
+    # image: pytorch/pytorch:/1.6.0-cuda10.1-cudnn7-runtime
+    # image: kh/pytorch-bisenetv2:latest
+    build: .
+    # shm_size: '2gb'  ## For raising your shared memory limit.
+    shm_size: '4gb'  ## For raising your shared memory limit until compleating to load 4,000 images.
+    command: /bin/bash
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1  ## 1 * Tesla V100 (32505MiB GPU) has enough memory.
+            capabilities: [gpu]
+          # - driver: nvidia
+          #   device_ids: ['0', '1']
+          #   capabilities: [gpu]
+    volumes:
+      - ./:/workspace
+      - ~/dataset:/workspace/dataset:ro
+    working_dir: /workspace
+  # test:
+  #   image: tensorflow/tensorflow:latest-gpu-py3-jupyter
+  #   command: python -c "import tensorflow as tf;tf.test.gpu_device_name()"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #         - driver: nvidia
+  #           device_ids: ['0', '1']
+  #           capabilities: [gpu]
+
