@@ -29,7 +29,7 @@ def setup_logger(name, logpth, log_level):
         log_level = level_dict[log_level]
     logging.basicConfig(level=log_level, format=FORMAT, filename=logfile)
     logging.root.addHandler(logging.StreamHandler())
-    return logtime
+    return '{}-{}'.format(name, logtime)
 
 
 def print_log_msg(epoch, max_epoch, it, max_iter, lr, time_meter, loss_meter, loss_pre_meter,
