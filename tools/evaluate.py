@@ -187,6 +187,25 @@ class MscEvalCrop(object):
 
 
 @torch.no_grad()
+def test_model(net, cfg, gpu_count, img_root, img_anns, n_classes, anns_ignore):
+    dl = prepare_data_loader(img_root, img_anns, cfg.input_size, cfg.imgs_per_gpu, gpu_count,
+            cfg.scales, cfg.cropsize, anns_ignore, mode='test', distributed=False)
+    net.eval()
+
+    heads, mious, eious = [], [], []
+    logger = logging.getLogger()
+
+    single_scale = MscEvalV0((1., ), False, ignore_target=anns_ignore)
+    mIOU, eIOU = single_scale(net, dl, n_classes)
+    heads.append('single_scale')
+    mious.append(mIOU)
+    logger.info('single mIOU is: %s', mIOU)
+    eious.append(eIOU)
+    logger.info('single eachIOU is: \n{}'.format(eIOU))
+    return heads, mious, eious
+
+
+@torch.no_grad()
 def eval_model(net, cfg, gpu_count, img_root, img_anns, n_classes, anns_ignore):
     # is_dist = dist.is_initialized()
     # dl = get_data_loader(img_root, img_anns, imgs_per_gpu, None,
@@ -251,7 +270,7 @@ def eval_model(net, cfg, gpu_count, img_root, img_anns, n_classes, anns_ignore):
     return heads, mious, eious
 
 
-def evaluate(cfg, weight_pth):
+def evaluate(cfg, weight_path):
     logger = logging.getLogger()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device_count = torch.cuda.device_count() if device.type == 'cuda' else None
@@ -260,7 +279,8 @@ def evaluate(cfg, weight_pth):
     logger.info('setup and restore model')
     net = model_factory[cfg.model_type](cfg.n_classes)
     #  net = BiSeNetV2(cfg.n_classes)
-    net.load_state_dict(torch.load(weight_pth))
+    net.load_state_dict(torch.load(weight_path))
+    logger.info('load state dict, {}, into model weight params'.format(weight_path))
     # net.cuda()
     net.to(device)
 
@@ -277,22 +297,23 @@ def evaluate(cfg, weight_pth):
     # heads, mious, eious = eval_model(net, 2, device_count, cfg.val_img_root, cfg.val_img_anns,
     #     cfg.n_classes, cfg.anns_ignore)
     heads, mious, eious = eval_model(net, cfg, device_count, cfg.val_img_root, cfg.val_img_anns,
-        cfg.n_classes, cfg.anns_ignore)
+                                    cfg.n_classes, cfg.anns_ignore)
     # logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
     logger.info('\n' + tabulate([mious, ], headers=heads, tablefmt='github', floatfmt=".8f"))
-    logger.info('\n' + tabulate(eious.transpose(), headers=heads, tablefmt='github', floatfmt=".8f"))
+    logger.info('\n' + tabulate(np.array(eious).transpose(), headers=heads,
+                tablefmt='github', floatfmt=".8f", showindex=True))
 
 
 def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--local_rank', dest='local_rank',
                     type=int, default=-1,)
-    # parse.add_argument('--weight-path', dest='weight_pth', type=str,
+    # parse.add_argument('--weight-path', dest='weight_path', type=str,
     #                    default='./res/model_final.pth',)
-    # parse.add_argument('--weight-path', dest='weight_pth', type=str,
-    #                 default='./res/weight/model_final_bisenetv2-train-info-2021-04-25-22-37-00.pth',)
     parse.add_argument('--weight-path', dest='weight_path', type=str,
-                    default='./res/weight/model_best_valid_loss.pth',)
+                    default='./res/weight/model_bestValidLoss-bisenetv2-train-info-2021-05-10-12-53-29.pth',)
+    # parse.add_argument('--weight-path', dest='weight_path', type=str,
+    #                 default='./res/weight/model_best_valid_loss.pth',)
     parse.add_argument('--port', dest='port', type=int, default=44553,)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2',)
     return parse.parse_args()
@@ -310,7 +331,7 @@ def main():
         # rank=args.local_rank
         # )
     if not os.path.exists(cfg.respth): os.makedirs(cfg.respth)
-    setup_logger('Trial-{}-eval-{}'.format(cfg.model_type,cfg.log_level), cfg.respth, cfg.log_level)
+    setup_logger('{}-eval-{}'.format(cfg.model_type,cfg.log_level), cfg.respth, cfg.log_level)
     evaluate(cfg, args.weight_path)
 
 

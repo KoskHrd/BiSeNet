@@ -21,7 +21,7 @@ from configs import cfg_factory
 # from lib.cityscapes_cv2 import get_data_loader
 from lib.carla_cv2 import get_data_loader, prepare_data_loader
 # from tools.evaluate import eval_model
-from tools.evaluate import eval_model
+from tools.evaluate import eval_model, test_model
 from lib.ohem_ce_loss import OhemCELoss
 from lib.lr_scheduler import WarmupPolyLrScheduler
 from lib.meters import TimeMeter, AvgMeter
@@ -287,11 +287,18 @@ def train(loginfo):
         torch.cuda.empty_cache()  ## For reset cuda memory used by cache
         # heads, mious = eval_model(net, 2, cfg.val_img_root, cfg.val_img_anns, cfg.n_classes)
         # logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
-        heads, mious, eious = eval_model(net, cfg, device_count, cfg.val_img_root, cfg.val_img_anns, cfg.n_classes, cfg.anns_ignore)
+        # heads, mious, eious = eval_model(net, cfg, device_count, cfg.val_img_root, cfg.val_img_anns, cfg.n_classes, cfg.anns_ignore)
+        heads, mious, eious = test_model(net, cfg, device_count, cfg.val_img_root, cfg.val_img_anns, cfg.n_classes, cfg.anns_ignore)
         logger.info('\n' + tabulate([mious, ], headers=heads, tablefmt='github', floatfmt=".8f"))
-        logger.info('\n' + tabulate([eious, ], headers=heads, tablefmt='github', floatfmt=".8f"))
+        logger.info('\n' + tabulate(np.array(eious).transpose(), headers=heads,
+                    tablefmt='github', floatfmt=".8f", showindex=True))
 
         n_epoch = n_epoch + 1
+
+    heads, mious, eious = eval_model(net, cfg, device_count, cfg.val_img_root, cfg.val_img_anns, cfg.n_classes, cfg.anns_ignore)
+    logger.info('\n' + tabulate([mious, ], headers=heads, tablefmt='github', floatfmt=".8f"))
+    logger.info('\n' + tabulate(np.array(eious).transpose(), headers=heads,
+                tablefmt='github', floatfmt=".8f", showindex=True))
 
     return
 
